@@ -1,7 +1,6 @@
 """UI configuration and Bluetooth discovery for Yunmu BLE meters."""
 from __future__ import annotations
 
-
 import re
 from typing import Any
 
