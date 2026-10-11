@@ -1,16 +1,22 @@
 {
   "domain": "yunmu_ble",
   "name": "Yunmu BLE Meter (Experimental)",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "documentation": "https://github.com/Tenqui-Noir/yunmu-ble-ha",
   "issue_tracker": "https://github.com/Tenqui-Noir/yunmu-ble-ha/issues",
   "integration_type": "device",
   "iot_class": "local_polling",
   "config_flow": true,
-  "dependencies": ["bluetooth", "bluetooth_adapters"],
+  "dependencies": [
+    "bluetooth",
+    "bluetooth_adapters"
+  ],
   "requirements": [],
   "bluetooth": [
-    {"local_name": "YUNM*", "connectable": true}
+    {
+      "local_name": "YUNM*",
+      "connectable": true
+    }
   ],
   "codeowners": []
 }

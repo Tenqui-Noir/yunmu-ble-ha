@@ -8,14 +8,14 @@
 
 > ⚠️ **不是官方产品，也未经过长期稳定性及电表厂商安全认证。** 目前仅在单台设备上验证了本地报文，Home Assistant / ESPHome Bluetooth Proxy 的实际链路尚待真机验收。对其他云木型号、固件版本不作兼容承诺。
 
-### 已有功能（v0.1）
+### 已有功能（v0.1.1）
 
 - 原生 HA 配置流程，支持通过 `YUNM*` 广播自动发现或手动输入蓝牙 MAC 地址。
-- 剩余电量 `kWh`、累计用电量 `kWh`、上次成功抄表时间三个传感器；累计电量采用 `total_increasing`，便于能源统计。
+- 剩余电量 `kWh`、累计用电量 `kWh`、上次成功抄表时间三个传感器，以及设备页面中的 **立即抄表** 按钮（手动读取至少间隔 30 秒）；累计电量采用 `total_increasing`，便于能源统计。
 - 通过 HA Bluetooth Manager 解析连接路径，可尝试走具有**主动连接功能**的 ESPHome Bluetooth Proxy。
 - 一次连接只发送一个已验证的读取命令；每次结束主动断开。
 - 轮换已在实测中成功的 `txMsgId=0/1`，即使超时也继续切换下一个编号，避免无限重复同一请求。
-- 默认每 **10 分钟**自动抄表一次，可设 5～120 分钟。读取失败不会触发高速重试。
+- 默认每 **10 分钟**自动抄表一次，可设 5～120 分钟。点击设备中的 **立即抄表** 可手动读取一次；抄表进行中或 30 秒内重复点击会拒绝执行。读取失败不会触发高速重试。
 - **只读**：不提供充值、清零、拉合闸或任意报文下发。
 
 ### 官方小程序兼容性（重要）
@@ -50,7 +50,7 @@ https://github.com/Tenqui-Noir/yunmu-ble-ha
 1. 确保 Home Assistant 已配置蓝牙适配器，或安装 ESPHome **Active Bluetooth Proxy**（仅被动扫描的代理无法连接 GATT）。尤其 HAOS 运行在 Hyper-V 时，通常需要远程主动代理或可直通的蓝牙适配器。
 2. 将仓库中的 `custom_components/yunmu_ble` 目录复制到 HA 配置目录下的 `custom_components/yunmu_ble`，重启 HA。
 3. 进入 **设置 → 设备与服务 → 添加集成**，搜索 `Yunmu BLE Meter (Experimental)`，输入电表的 BLE MAC 地址，或者从发现提示中确认设备。
-4. 进入集成的 **配置** 修改刷新间隔；如果读数不可用，请检查 HA 蓝牙日志、可连接适配器和代理的 BLE 覆盖范围。
+4. 设备页面可点击 **立即抄表** 立即读取；进入集成的 **配置** 修改刷新间隔；如果读数不可用，请检查 HA 蓝牙日志、可连接适配器和代理的 BLE 覆盖范围。
 5. 需暂停抄表时，在设备与服务中禁用集成。初次配置无需通过 BLE 写入任何控制命令。
 
 **尚未真机验收：** 本仓库的自动测试只验证已捕获的 BLE 协议报文，无法覆盖代理实际连接、不同 ROM/固件的通知订阅行为或长期稳定性。安装前建议备份 HA 配置，首次试验完成后用官方小程序确认抄表正常。
@@ -78,7 +78,7 @@ python -m compileall -q custom_components tests
 
 ## English
 
-Experimental, unofficial **read-only** Bluetooth Low Energy integration for Yunmu prepaid electricity meters, based on a single observed YM-M4-BE unit. It exposes remaining electricity (kWh), cumulative consumption (kWh), and timestamp of the last successful read. It does not contact Yunmu's servers.
+Experimental, unofficial **read-only** Bluetooth Low Energy integration for Yunmu prepaid electricity meters, based on a single observed YM-M4-BE unit. It exposes remaining electricity (kWh), cumulative consumption (kWh), timestamp of the last successful read, and a rate-limited manual **Read now** button (30-second cooldown). It does not contact Yunmu's servers.
 
 **Important:** The observed `txMsgId` counter may be subject to duplicate filtering. In one experiment, the official mini-program timed out after a local read intentionally used the expected next ID; cancelling and re-reading restored operation. The root cause and collision frequency are unproven. Disable this integration before payment, recharge, or other important official meter operations. The response's trailing integrity bytes have not yet been decoded, and no complete checksum verification is implemented.
 

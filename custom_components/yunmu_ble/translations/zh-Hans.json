@@ -2,12 +2,52 @@
   "title": "云木蓝牙电表（实验版）",
   "config": {
     "step": {
-      "user": {"title": "添加云木蓝牙电表", "description": "填写电表的蓝牙 MAC 地址。本集成仅读取电量数据。", "data": {"address": "蓝牙 MAC 地址"}},
-      "confirm": {"title": "确认云木蓝牙电表", "description": "要添加发现的电表吗？本实验性集成采用本地定时读取，偶尔可能与官方小程序抄表冲突。"}
+      "user": {
+        "title": "添加云木蓝牙电表",
+        "description": "填写电表的蓝牙 MAC 地址。本集成仅读取电量数据。",
+        "data": {
+          "address": "蓝牙 MAC 地址"
+        }
+      },
+      "confirm": {
+        "title": "确认云木蓝牙电表",
+        "description": "要添加发现的电表吗？本实验性集成采用本地定时读取，偶尔可能与官方小程序抄表冲突。"
+      }
     },
-    "error": {"invalid_address": "请输入有效的蓝牙 MAC 地址。"},
-    "abort": {"already_configured": "此电表已经配置。", "unsupported_device": "不支持此蓝牙设备。"}
+    "error": {
+      "invalid_address": "请输入有效的蓝牙 MAC 地址。"
+    },
+    "abort": {
+      "already_configured": "此电表已经配置。",
+      "unsupported_device": "不支持此蓝牙设备。"
+    }
   },
-  "options": {"step": {"init": {"title": "云木抄表选项", "data": {"poll_interval": "抄表间隔（分钟，5～120）"}}}},
-  "entity": {"sensor": {"remaining_energy": {"name": "剩余电量"}, "total_energy": {"name": "累计用电量"}, "last_read": {"name": "上次成功抄表时间"}}}
+  "options": {
+    "step": {
+      "init": {
+        "title": "云木抄表选项",
+        "data": {
+          "poll_interval": "抄表间隔（分钟，5～120）"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "remaining_energy": {
+        "name": "剩余电量"
+      },
+      "total_energy": {
+        "name": "累计用电量"
+      },
+      "last_read": {
+        "name": "上次成功抄表时间"
+      }
+    },
+    "button": {
+      "read_now": {
+        "name": "立即抄表"
+      }
+    }
+  }
 }

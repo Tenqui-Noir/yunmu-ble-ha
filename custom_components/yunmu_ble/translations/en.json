@@ -2,12 +2,52 @@
   "title": "Yunmu BLE Meter (Experimental)",
   "config": {
     "step": {
-      "user": {"title": "Add Yunmu BLE meter", "description": "Enter the Bluetooth MAC address of your meter. This integration only reads electricity data.", "data": {"address": "Bluetooth MAC address"}},
-      "confirm": {"title": "Confirm Yunmu BLE meter", "description": "Add the discovered meter? This experimental integration polls locally and may occasionally interfere with official meter reads."}
+      "user": {
+        "title": "Add Yunmu BLE meter",
+        "description": "Enter the Bluetooth MAC address of your meter. This integration only reads electricity data.",
+        "data": {
+          "address": "Bluetooth MAC address"
+        }
+      },
+      "confirm": {
+        "title": "Confirm Yunmu BLE meter",
+        "description": "Add the discovered meter? This experimental integration polls locally and may occasionally interfere with official meter reads."
+      }
     },
-    "error": {"invalid_address": "Enter a valid Bluetooth MAC address."},
-    "abort": {"already_configured": "This meter is already configured.", "unsupported_device": "This Bluetooth device is not supported."}
+    "error": {
+      "invalid_address": "Enter a valid Bluetooth MAC address."
+    },
+    "abort": {
+      "already_configured": "This meter is already configured.",
+      "unsupported_device": "This Bluetooth device is not supported."
+    }
   },
-  "options": {"step": {"init": {"title": "Yunmu polling options", "data": {"poll_interval": "Polling interval (minutes, 5–120)"}}}},
-  "entity": {"sensor": {"remaining_energy": {"name": "Remaining electricity"}, "total_energy": {"name": "Total electricity consumption"}, "last_read": {"name": "Last successful reading"}}}
+  "options": {
+    "step": {
+      "init": {
+        "title": "Yunmu polling options",
+        "data": {
+          "poll_interval": "Polling interval (minutes, 5–120)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "remaining_energy": {
+        "name": "Remaining electricity"
+      },
+      "total_energy": {
+        "name": "Total electricity consumption"
+      },
+      "last_read": {
+        "name": "Last successful reading"
+      }
+    },
+    "button": {
+      "read_now": {
+        "name": "Read now"
+      }
+    }
+  }
 }
