@@ -28,7 +28,8 @@
         "title": "云木抄表选项",
         "data": {
           "poll_interval": "抄表间隔（分钟，5～120）"
-        }
+        },
+        "description": "设置两次自动抄表之间的间隔，也可直接在设备页面修改（5～120 分钟）。"
       }
     }
   },
@@ -47,6 +48,11 @@
     "button": {
       "read_now": {
         "name": "立即抄表"
+      }
+    },
+    "number": {
+      "poll_interval": {
+        "name": "自动抄表间隔"
       }
     }
   }

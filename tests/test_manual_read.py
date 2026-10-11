@@ -116,7 +116,7 @@ def test_manual_read_cooldown_blocks_immediate_repeated_click(monkeypatch):
 
     async def check():
         await coordinator.async_manual_read()
-        with pytest.raises(home_assistant_error, match="30 seconds"):
+        with pytest.raises(home_assistant_error, match="5 seconds"):
             await coordinator.async_manual_read()
 
     asyncio.run(check())
@@ -145,3 +145,20 @@ def test_failed_manual_refresh_is_reported(monkeypatch):
     with pytest.raises(home_assistant_error, match="read failed"):
         asyncio.run(coordinator.async_manual_read())
     assert coordinator.refresh_count == 1
+
+def test_manual_read_allows_next_attempt_after_five_seconds(monkeypatch):
+    coordinator_module, _, home_assistant_error = load_manual_modules(monkeypatch)
+    coordinator = make_coordinator(coordinator_module.YunmuCoordinator)
+    clock = [100.0]
+    monkeypatch.setattr(coordinator_module, "monotonic", lambda: clock[0])
+
+    async def check():
+        await coordinator.async_manual_read()
+        clock[0] += 4.99
+        with pytest.raises(home_assistant_error, match="5 seconds"):
+            await coordinator.async_manual_read()
+        clock[0] += 0.01
+        await coordinator.async_manual_read()
+
+    asyncio.run(check())
+    assert coordinator.refresh_count == 2

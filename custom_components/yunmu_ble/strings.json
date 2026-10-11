@@ -28,7 +28,8 @@
         "title": "Yunmu polling options",
         "data": {
           "poll_interval": "Polling interval (minutes, 5–120)"
-        }
+        },
+        "description": "Set the time between automatic readings, or change it on the device page (5–120 minutes)."
       }
     }
   },
@@ -47,6 +48,11 @@
     "button": {
       "read_now": {
         "name": "Read now"
+      }
+    },
+    "number": {
+      "poll_interval": {
+        "name": "Automatic polling interval"
       }
     }
   }

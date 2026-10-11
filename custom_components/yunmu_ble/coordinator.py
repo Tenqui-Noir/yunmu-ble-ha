@@ -56,7 +56,7 @@ class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
                 self._last_manual_attempt is not None
                 and now - self._last_manual_attempt < MANUAL_READ_COOLDOWN_SECONDS
             ):
-                raise HomeAssistantError("Please wait 30 seconds before another manual meter read")
+                raise HomeAssistantError("Please wait 5 seconds before another manual meter read")
             # A scheduled read might have started while waiting for the lock.
             if self._read_in_progress:
                 raise HomeAssistantError("A Yunmu meter read is already in progress")
