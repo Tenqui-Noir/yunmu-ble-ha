@@ -29,7 +29,23 @@
 - 官方小程序报错后，先停止本集成再使用官方功能，不要高频反复尝试。
 - 避免不必要的高频轮询（默认 10 分钟）；与官方小程序的绝对零冲突**无法保证**。
 
-### 安装（手动，v0.1 阶段）
+### 通过 HACS 安装（推荐）
+
+如果 Home Assistant 已安装 [HACS](https://www.hacs.xyz/)，可以直接点击：
+
+[在 HACS 中打开 Yunmu BLE Meter](https://my.home-assistant.io/redirect/hacs_repository/?owner=Tenqui-Noir&repository=yunmu-ble-ha&category=integration)
+
+或者在 **HACS → 右上角三个点 → 自定义存储库** 中添加：
+
+```text
+https://github.com/Tenqui-Noir/yunmu-ble-ha
+```
+
+选择类型 **Integration（集成）**，添加后在 HACS 搜索并下载 **Yunmu BLE Meter (Experimental)**，然后**重启 Home Assistant**，再到 **设置 → 设备与服务 → 添加集成** 搜索 `Yunmu BLE Meter (Experimental)` 并配置蓝牙 MAC 地址。
+
+**前提**：HA 已有可执行主动 GATT 连接的蓝牙适配器或 ESPHome Active Bluetooth Proxy；HACS 负责下载安装，不会提供蓝牙硬件。
+
+### 安装（手动，备选方式）
 
 1. 确保 Home Assistant 已配置蓝牙适配器，或安装 ESPHome **Active Bluetooth Proxy**（仅被动扫描的代理无法连接 GATT）。尤其 HAOS 运行在 Hyper-V 时，通常需要远程主动代理或可直通的蓝牙适配器。
 2. 将仓库中的 `custom_components/yunmu_ble` 目录复制到 HA 配置目录下的 `custom_components/yunmu_ble`，重启 HA。
