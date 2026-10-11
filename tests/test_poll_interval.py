@@ -54,13 +54,13 @@ class MockHass:
         entry.options = options
 
 
-def make_number(number_module, options=None):
+def make_number(number_module, options=None, entity_class=None):
     entry = SimpleNamespace(
         data={"address": "22:08:03:01:4C:54"},
         title="Yunmu test meter",
         options=options or {},
     )
-    entity = number_module.YunmuPollInterval(entry)
+    entity = (entity_class or number_module.YunmuPollInterval)(entry)
     hass = MockHass()
     entity.hass = hass
     return entity, entry, hass
@@ -104,3 +104,34 @@ def test_change_to_minimum_interval(monkeypatch):
     entity, _, _ = make_number(module)
     asyncio.run(entity.async_set_native_value(5.0))
     assert entity.native_value == 5
+
+
+def test_low_energy_threshold_is_configurable_on_device_page(monkeypatch):
+    module = load_number(monkeypatch)
+    entity, entry, hass = make_number(
+        module, {"poll_interval": 10, "other": True}, module.YunmuLowEnergyThreshold
+    )
+    assert entity.native_value == 10
+    assert entity._attr_native_min_value == 0
+    assert entity._attr_native_max_value == 1000
+    assert entity._attr_native_unit_of_measurement == "kWh"
+    assert entity._attr_unique_id == "22:08:03:01:4C:54_low_energy_threshold"
+    assert entity._attr_entity_category == "config"
+
+    asyncio.run(entity.async_set_native_value(25.0))
+    assert entry.options == {
+        "poll_interval": 10, "other": True, "low_energy_threshold": 25
+    }
+    assert entity.native_value == 25
+    asyncio.run(entity.async_set_native_value(0.0))
+    assert entity.native_value == 0
+    assert len(hass.changes) == 2
+
+
+@pytest.mark.parametrize("value", [-1.0, 1001.0, 2.5])
+def test_low_energy_threshold_rejects_invalid_values(monkeypatch, value):
+    module = load_number(monkeypatch)
+    entity, _, hass = make_number(module, entity_class=module.YunmuLowEnergyThreshold)
+    with pytest.raises(ValueError):
+        asyncio.run(entity.async_set_native_value(value))
+    assert hass.changes == []

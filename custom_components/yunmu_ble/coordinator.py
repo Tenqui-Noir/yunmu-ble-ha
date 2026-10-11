@@ -13,7 +13,9 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    CONF_LOW_ENERGY_THRESHOLD,
     CONF_POLL_INTERVAL,
+    DEFAULT_LOW_ENERGY_THRESHOLD,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
     MANUAL_READ_COOLDOWN_SECONDS,
@@ -39,6 +41,10 @@ class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
         self._read_in_progress = False
         self._consecutive_failures = 0
         self._failure_notification_sent = False
+        self._low_energy_threshold = int(
+            entry.options.get(CONF_LOW_ENERGY_THRESHOLD, DEFAULT_LOW_ENERGY_THRESHOLD)
+        )
+        self._low_energy_notified = False
         super().__init__(
             hass,
             _LOGGER,
@@ -89,6 +95,26 @@ class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
             )
             self._failure_notification_sent = True
 
+    def _check_low_energy(self, reading: MeterReading) -> None:
+        """Notify once when a successful reading is at or below the configured threshold."""
+        threshold = self._low_energy_threshold
+        if threshold == 0 or reading.remaining_kwh > threshold:
+            self._low_energy_notified = False
+            return
+        if self._low_energy_notified:
+            return
+
+        persistent_notification.async_create(
+            self.hass,
+            (
+                f"电表 {self.address} 剩余电量仅 {reading.remaining_kwh:.2f} kWh，"
+                f"已达到设定的 {threshold} kWh 提醒阈值，请及时关注电量余额。"
+            ),
+            title="云木蓝牙电表剩余电量不足",
+            notification_id=f"{DOMAIN}_low_energy_{self.address.replace(':', '').lower()}",
+        )
+        self._low_energy_notified = True
+
     async def _async_update_data(self) -> MeterReading:
         self._read_in_progress = True
         try:
@@ -113,6 +139,7 @@ class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
             self._failure_notification_sent = False
             self.last_success = datetime.now(UTC)
             self._last_successful_id = msg_id
+            self._check_low_energy(reading)
             return reading
         except UpdateFailed:
             self._record_failed_read()

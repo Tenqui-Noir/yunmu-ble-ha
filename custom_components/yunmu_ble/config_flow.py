@@ -11,10 +11,14 @@ from homeassistant.const import CONF_ADDRESS
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
+    CONF_LOW_ENERGY_THRESHOLD,
     CONF_POLL_INTERVAL,
+    DEFAULT_LOW_ENERGY_THRESHOLD,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
+    MAX_LOW_ENERGY_THRESHOLD,
     MAX_POLL_INTERVAL,
+    MIN_LOW_ENERGY_THRESHOLD,
     MIN_POLL_INTERVAL,
 )
 
@@ -82,7 +86,7 @@ class YunmuConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class YunmuOptionsFlow(config_entries.OptionsFlow):
-    """Permit a conservative polling interval to be configured."""
+    """Configure polling and low-energy notification threshold."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._config_entry = config_entry
@@ -102,6 +106,15 @@ class YunmuOptionsFlow(config_entries.OptionsFlow):
                     ): vol.All(
                         vol.Coerce(int),
                         vol.Range(min=MIN_POLL_INTERVAL, max=MAX_POLL_INTERVAL),
+                    ),
+                    vol.Required(
+                        CONF_LOW_ENERGY_THRESHOLD,
+                        default=self._config_entry.options.get(
+                            CONF_LOW_ENERGY_THRESHOLD, DEFAULT_LOW_ENERGY_THRESHOLD
+                        ),
+                    ): vol.All(
+                        vol.Coerce(int),
+                        vol.Range(min=MIN_LOW_ENERGY_THRESHOLD, max=MAX_LOW_ENERGY_THRESHOLD),
                     )
                 }
             ),

@@ -179,6 +179,8 @@ def make_polling_coordinator(coordinator_class):
     coordinator._next_tx_msg_id = 0
     coordinator._consecutive_failures = 0
     coordinator._failure_notification_sent = False
+    coordinator._low_energy_threshold = 10
+    coordinator._low_energy_notified = False
     coordinator._read_in_progress = False
     return coordinator
 
@@ -263,3 +265,88 @@ def test_success_resets_failure_counter_for_a_new_notification(monkeypatch):
     asyncio.run(check())
     assert coordinator._consecutive_failures == 3
     assert not coordinator._read_in_progress
+
+
+def test_low_energy_alert_once_until_a_reading_recovers(monkeypatch):
+    coordinator_module, _, _ = load_manual_modules(monkeypatch)
+    coordinator = make_polling_coordinator(coordinator_module.YunmuCoordinator)
+    notifications = []
+    energy = {"remaining": 11.0}
+
+    monkeypatch.setattr(
+        coordinator_module.bluetooth,
+        "async_ble_device_from_address",
+        lambda *args, **kwargs: SimpleNamespace(address=coordinator.address),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        coordinator_module.persistent_notification,
+        "async_create",
+        lambda *args, **kwargs: notifications.append((args, kwargs)),
+    )
+
+    async def read(device, msg_id):
+        return SimpleNamespace(remaining_kwh=energy["remaining"], total_kwh=7163.0)
+
+    monkeypatch.setattr(coordinator_module, "read_meter", read)
+
+    async def check():
+        await coordinator._async_update_data()
+        assert notifications == []
+        energy["remaining"] = 10.0  # Exactly at threshold triggers a notice.
+        await coordinator._async_update_data()
+        assert len(notifications) == 1
+        assert "10.00 kWh" in notifications[0][0][1]
+        assert "low_energy_220803014c54" in notifications[0][1]["notification_id"]
+        energy["remaining"] = 6.0
+        await coordinator._async_update_data()
+        assert len(notifications) == 1
+        energy["remaining"] = 12.0
+        await coordinator._async_update_data()
+        assert not coordinator._low_energy_notified
+        energy["remaining"] = 9.0
+        await coordinator._async_update_data()
+        assert len(notifications) == 2
+
+    asyncio.run(check())
+
+
+def test_low_energy_alert_disabled_and_never_triggered_by_failure(monkeypatch):
+    coordinator_module, _, _ = load_manual_modules(monkeypatch)
+    coordinator = make_polling_coordinator(coordinator_module.YunmuCoordinator)
+    notifications = []
+    available = {"value": False}
+
+    monkeypatch.setattr(
+        coordinator_module.bluetooth,
+        "async_ble_device_from_address",
+        lambda *args, **kwargs: (
+            SimpleNamespace(address=coordinator.address) if available["value"] else None
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        coordinator_module.persistent_notification,
+        "async_create",
+        lambda *args, **kwargs: notifications.append(kwargs),
+    )
+
+    async def read(device, msg_id):
+        return SimpleNamespace(remaining_kwh=0.0, total_kwh=7163.0)
+
+    monkeypatch.setattr(coordinator_module, "read_meter", read)
+
+    async def check():
+        with pytest.raises(coordinator_module.UpdateFailed):
+            await coordinator._async_update_data()
+        assert not notifications
+
+        available["value"] = True
+        coordinator._low_energy_threshold = 0
+        await coordinator._async_update_data()
+        assert not notifications
+        coordinator._low_energy_threshold = 10
+        await coordinator._async_update_data()
+        assert len(notifications) == 1
+
+    asyncio.run(check())

@@ -17,6 +17,7 @@
 - 轮换已在实测中成功的 `txMsgId=0/1`，即使超时也继续切换下一个编号，避免无限重复同一请求。
 - 默认每 **10 分钟**自动抄表一次，可设 5～120 分钟。可在设备页面的 **配置 → 自动抄表间隔** 直接修改，或在 **设置 → 设备与服务 → Yunmu BLE Meter → 配置** 中修改，保存后自动重载生效。点击设备中的 **立即抄表** 可手动读取一次；抄表进行中或 5 秒内重复点击会拒绝执行。读取失败不会触发高速重试。
 - 抄表失败后保留最近一次成功读取的传感器数值（从未成功读取过时仍显示不可用）；连续 **3 次**实际抄表失败时，在 HA 通知中心创建**一条**通知，之后不重复提醒，直到成功一次才重新计数。**上次成功抄表时间**仅在成功时更新；通知不会推送到手机。
+- **低电量提醒阈值**：设备页面的配置数字实体可设置剩余电量阈值（0～1000 kWh，默认 **10 kWh**；设置为 **0** 关闭提醒），也可通过集成的 **配置** 页面修改。成功抄表时剩余电量 ≤ 阈值，HA 通知中心提示一次；持续低电量期间不重复提醒，只有重新抄到高于阈值的数值后才会允许下一次提醒。不会因抄表失败或保留的旧数据发送低电量提醒，也不发送手机推送。
 - **只读**：不提供充值、清零、拉合闸或任意报文下发。
 
 ### 官方小程序兼容性（重要）
@@ -79,7 +80,7 @@ python -m compileall -q custom_components tests
 
 ## English
 
-Experimental, unofficial **read-only** Bluetooth Low Energy integration for Yunmu prepaid electricity meters, based on a single observed YM-M4-BE unit. It exposes remaining electricity (kWh), cumulative consumption (kWh), timestamp of the last successful read, a configurable device-level polling interval (5–120 minutes, default 10), and a rate-limited manual **Read now** button (5-second cooldown). It does not contact Yunmu's servers. After a failed read, previously valid sensor values remain visible, and one Home Assistant persistent notification is created on the third consecutive failure. A successful read resets the failure streak. This does not send a mobile push notification.
+Experimental, unofficial **read-only** Bluetooth Low Energy integration for Yunmu prepaid electricity meters, based on a single observed YM-M4-BE unit. It exposes remaining electricity (kWh), cumulative consumption (kWh), timestamp of the last successful read, a configurable device-level polling interval (5–120 minutes, default 10), and a rate-limited manual **Read now** button (5-second cooldown). It does not contact Yunmu's servers. After a failed read, previously valid sensor values remain visible, and one Home Assistant persistent notification is created on the third consecutive failure. A successful read resets the failure streak. The configurable low-electricity threshold (0–1000 kWh, 10 kWh by default; 0 disables) creates a separate persistent notification only when a successful reading is at or below the threshold, once until a later reading rises above it. This does not send a mobile push notification.
 
 **Important:** The observed `txMsgId` counter may be subject to duplicate filtering. In one experiment, the official mini-program timed out after a local read intentionally used the expected next ID; cancelling and re-reading restored operation. The root cause and collision frequency are unproven. Disable this integration before payment, recharge, or other important official meter operations. The response's trailing integrity bytes have not yet been decoded, and no complete checksum verification is implemented.
 

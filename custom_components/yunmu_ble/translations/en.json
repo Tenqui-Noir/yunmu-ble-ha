@@ -27,9 +27,10 @@
       "init": {
         "title": "Yunmu polling options",
         "data": {
-          "poll_interval": "Polling interval (minutes, 5–120)"
+          "poll_interval": "Polling interval (minutes, 5–120)",
+          "low_energy_threshold": "Low electricity alert threshold (kWh; 0 disables)"
         },
-        "description": "Set the time between automatic readings, or change it on the device page (5–120 minutes)."
+        "description": "Set the polling interval and low-energy threshold; both can also be changed on the device page."
       }
     }
   },
@@ -53,6 +54,9 @@
     "number": {
       "poll_interval": {
         "name": "Automatic polling interval"
+      },
+      "low_energy_threshold": {
+        "name": "Low electricity alert threshold"
       }
     }
   }
