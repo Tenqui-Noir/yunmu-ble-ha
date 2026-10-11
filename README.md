@@ -1,1 +1,69 @@
-# yunmu-ble-ha
+# Yunmu BLE Meter for Home Assistant (experimental)
+
+[简体中文](#简体中文) · [English](#english)
+
+## 简体中文
+
+一个**非官方、实验性、只读**的 Home Assistant 自定义集成，通过 BLE GATT 本地读取已实测的云木预付费电表（YM-M4-BE）。不需要云木账号、云端服务器或远端 API。
+
+> ⚠️ **不是官方产品，也未经过长期稳定性及电表厂商安全认证。** 目前仅在单台设备上验证了本地报文，Home Assistant / ESPHome Bluetooth Proxy 的实际链路尚待真机验收。对其他云木型号、固件版本不作兼容承诺。
+
+### 已有功能（v0.1）
+
+- 原生 HA 配置流程，支持通过 `YUNM*` 广播自动发现或手动输入蓝牙 MAC 地址。
+- 剩余电量 `kWh`、累计用电量 `kWh`、上次成功抄表时间三个传感器；累计电量采用 `total_increasing`，便于能源统计。
+- 通过 HA Bluetooth Manager 解析连接路径，可尝试走具有**主动连接功能**的 ESPHome Bluetooth Proxy。
+- 一次连接只发送一个已验证的读取命令；每次结束主动断开。
+- 轮换已在实测中成功的 `txMsgId=0/1`，即使超时也继续切换下一个编号，避免无限重复同一请求。
+- 默认每 **10 分钟**自动抄表一次，可设 5～120 分钟。读取失败不会触发高速重试。
+- **只读**：不提供充值、清零、拉合闸或任意报文下发。
+
+### 官方小程序兼容性（重要）
+
+协议包含 `txMsgId` 请求编号。实验观察到，重复使用相同编号可能导致电表不回复；本地提前使用官方下一次预计分配的编号后，官方小程序曾提示「设备下发未响应，请稍后重试」。取消并重新发起官方抄表后，该次测试恢复正常。
+
+**目前尚未通过 HCI 记录完全证明这次官方报错由编号碰撞造成，故不能给出可靠的冲突概率。** 官方客户端与本集成同时使用时可能发生读取超时；也不能保证所有设备和异常都能自动恢复。
+
+- 使用官方小程序抄表、充值及重要操作前，建议在 HA **设置 → 设备与服务** 暂时**禁用此集成**；完成后再启用。
+- **充值、缴费、拉闸、合闸等敏感流程期间，不要运行本集成。**
+- 官方小程序报错后，先停止本集成再使用官方功能，不要高频反复尝试。
+- 避免不必要的高频轮询（默认 10 分钟）；与官方小程序的绝对零冲突**无法保证**。
+
+### 安装（手动，v0.1 阶段）
+
+1. 确保 Home Assistant 已配置蓝牙适配器，或安装 ESPHome **Active Bluetooth Proxy**（仅被动扫描的代理无法连接 GATT）。尤其 HAOS 运行在 Hyper-V 时，通常需要远程主动代理或可直通的蓝牙适配器。
+2. 将仓库中的 `custom_components/yunmu_ble` 目录复制到 HA 配置目录下的 `custom_components/yunmu_ble`，重启 HA。
+3. 进入 **设置 → 设备与服务 → 添加集成**，搜索 `Yunmu BLE Meter (Experimental)`，输入电表的 BLE MAC 地址，或者从发现提示中确认设备。
+4. 进入集成的 **配置** 修改刷新间隔；如果读数不可用，请检查 HA 蓝牙日志、可连接适配器和代理的 BLE 覆盖范围。
+5. 需暂停抄表时，在设备与服务中禁用集成。初次配置无需通过 BLE 写入任何控制命令。
+
+**尚未真机验收：** 本仓库的自动测试只验证已捕获的 BLE 协议报文，无法覆盖代理实际连接、不同 ROM/固件的通知订阅行为或长期稳定性。安装前建议备份 HA 配置，首次试验完成后用官方小程序确认抄表正常。
+
+### 协议依据
+
+- UART GATT 服务：`49535343-fe7d-4ae5-8fa9-9fafd205e455`
+- Write Without Response：`49535343-8841-43f4-a8d4-ecbe34729bb3`
+- Notify：`49535343-1e4d-4bd9-ba61-23c647249616`
+- 读请求 ID 0：`D4D5D5C4DD`；ID 1：`D4D4D5C7DC`
+- Notify：20 字节，每字节 XOR `0x91`，返回值的第二字节回显请求 ID；偏移 7～10、11～14 两个 32 位大端字段分别代表剩余、累计电量（除以 100 得 kWh）。
+- 响应末尾完整性/校验字段**尚未破解**：现有实现只检查结构、匹配编号和数值范围，**不能当作已完成 CRC 验证**。
+- 0/1 编号轮换适用于当前实验样本，不保证未来固件兼容；切勿将推导的五字节格式用于其他未知电表操作。
+
+### 开发与测试
+
+```bash
+python -m pip install pytest ruff
+python -m pytest -q
+ruff check .
+python -m compileall -q custom_components tests
+```
+
+后续计划：真机验证 Bluetooth Proxy、完善断线及掉包行为测试、确认 Notify 校验算法；暂不支持写操作。
+
+## English
+
+Experimental, unofficial **read-only** Bluetooth Low Energy integration for Yunmu prepaid electricity meters, based on a single observed YM-M4-BE unit. It exposes remaining electricity (kWh), cumulative consumption (kWh), and timestamp of the last successful read. It does not contact Yunmu's servers.
+
+**Important:** The observed `txMsgId` counter may be subject to duplicate filtering. In one experiment, the official mini-program timed out after a local read intentionally used the expected next ID; cancelling and re-reading restored operation. The root cause and collision frequency are unproven. Disable this integration before payment, recharge, or other important official meter operations. The response's trailing integrity bytes have not yet been decoded, and no complete checksum verification is implemented.
+
+Home Assistant Bluetooth and an active, connectable BLE adapter / ESPHome Bluetooth Proxy are required. Install `custom_components/yunmu_ble` into your HA configuration and restart. This code has offline protocol tests but **has not yet been hardware-tested through HA or an ESPHome proxy**.
