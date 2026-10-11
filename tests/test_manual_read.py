@@ -17,6 +17,7 @@ def load_manual_modules(monkeypatch):
         "homeassistant",
         "homeassistant.components",
         "homeassistant.components.bluetooth",
+        "homeassistant.components.persistent_notification",
         "homeassistant.components.button",
         "homeassistant.config_entries",
         "homeassistant.core",
@@ -43,6 +44,9 @@ def load_manual_modules(monkeypatch):
         pass
 
     modules["homeassistant.components.button"].ButtonEntity = type("ButtonEntity", (), {})
+    modules["homeassistant.components.persistent_notification"].async_create = (
+        lambda *args, **kwargs: None
+    )
     modules["homeassistant.config_entries"].ConfigEntry = type("ConfigEntry", (), {})
     modules["homeassistant.core"].HomeAssistant = type("HomeAssistant", (), {})
     modules["homeassistant.exceptions"].HomeAssistantError = HomeAssistantError
@@ -162,3 +166,100 @@ def test_manual_read_allows_next_attempt_after_five_seconds(monkeypatch):
 
     asyncio.run(check())
     assert coordinator.refresh_count == 2
+
+
+def make_polling_coordinator(coordinator_class):
+    """Construct a coordinator with a previously successful meter reading."""
+    coordinator = coordinator_class.__new__(coordinator_class)
+    coordinator.hass = object()
+    coordinator.address = "22:08:03:01:4C:54"
+    coordinator.data = SimpleNamespace(remaining_kwh=139.0, total_kwh=7163.0)
+    coordinator.last_success = "last successful time"
+    coordinator._last_successful_id = None
+    coordinator._next_tx_msg_id = 0
+    coordinator._consecutive_failures = 0
+    coordinator._failure_notification_sent = False
+    coordinator._read_in_progress = False
+    return coordinator
+
+
+def test_three_failures_notify_once_without_replacing_old_reading(monkeypatch):
+    coordinator_module, _, _ = load_manual_modules(monkeypatch)
+    coordinator = make_polling_coordinator(coordinator_module.YunmuCoordinator)
+    original_reading = coordinator.data
+    alerts = []
+
+    monkeypatch.setattr(
+        coordinator_module.bluetooth,
+        "async_ble_device_from_address",
+        lambda *args, **kwargs: None,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        coordinator_module.persistent_notification,
+        "async_create",
+        lambda *args, **kwargs: alerts.append((args, kwargs)),
+    )
+
+    async def fail_four_times():
+        for _ in range(4):
+            with pytest.raises(coordinator_module.UpdateFailed, match="not in range"):
+                await coordinator._async_update_data()
+
+    asyncio.run(fail_four_times())
+    assert coordinator._consecutive_failures == 4
+    assert coordinator.data is original_reading
+    assert coordinator.last_success == "last successful time"
+    assert len(alerts) == 1
+    assert alerts[0][0][0] is coordinator.hass
+    assert "连续 3 次" in alerts[0][0][1]
+    assert "read_failure_220803014c54" in alerts[0][1]["notification_id"]
+    assert not coordinator._read_in_progress
+
+
+def test_success_resets_failure_counter_for_a_new_notification(monkeypatch):
+    coordinator_module, _, _ = load_manual_modules(monkeypatch)
+    coordinator = make_polling_coordinator(coordinator_module.YunmuCoordinator)
+    alerts = []
+    state = {"should_fail": True}
+
+    monkeypatch.setattr(
+        coordinator_module.bluetooth,
+        "async_ble_device_from_address",
+        lambda *args, **kwargs: SimpleNamespace(address=coordinator.address),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        coordinator_module.persistent_notification,
+        "async_create",
+        lambda *args, **kwargs: alerts.append(kwargs),
+    )
+
+    async def fake_read_meter(device, msg_id):
+        if state["should_fail"]:
+            raise coordinator_module.YunmuBLEError("BLE timeout")
+        return SimpleNamespace(remaining_kwh=138.9, total_kwh=7163.1)
+
+    monkeypatch.setattr(coordinator_module, "read_meter", fake_read_meter)
+
+    async def check():
+        for _ in range(3):
+            with pytest.raises(coordinator_module.UpdateFailed, match="BLE timeout"):
+                await coordinator._async_update_data()
+        assert len(alerts) == 1
+
+        state["should_fail"] = False
+        new_reading = await coordinator._async_update_data()
+        assert new_reading.remaining_kwh == 138.9
+        assert coordinator._consecutive_failures == 0
+        assert not coordinator._failure_notification_sent
+
+        state["should_fail"] = True
+        for _ in range(3):
+            with pytest.raises(coordinator_module.UpdateFailed, match="BLE timeout"):
+                await coordinator._async_update_data()
+        assert len(alerts) == 2
+
+    asyncio.run(check())
+    assert coordinator._consecutive_failures == 3
+    assert not coordinator._read_in_progress

@@ -8,7 +8,7 @@
 
 > ⚠️ **不是官方产品，也未经过长期稳定性及电表厂商安全认证。** 目前仅在单台设备上验证了本地报文，Home Assistant / ESPHome Bluetooth Proxy 的实际链路尚待真机验收。对其他云木型号、固件版本不作兼容承诺。
 
-### 已有功能（v0.1.2）
+### 已有功能
 
 - 原生 HA 配置流程，支持通过 `YUNM*` 广播自动发现或手动输入蓝牙 MAC 地址。
 - 剩余电量 `kWh`、累计用电量 `kWh`、上次成功抄表时间三个传感器，以及设备页面中的 **立即抄表** 按钮（手动读取至少间隔 5 秒）；累计电量采用 `total_increasing`，便于能源统计。
@@ -16,6 +16,7 @@
 - 一次连接只发送一个已验证的读取命令；每次结束主动断开。
 - 轮换已在实测中成功的 `txMsgId=0/1`，即使超时也继续切换下一个编号，避免无限重复同一请求。
 - 默认每 **10 分钟**自动抄表一次，可设 5～120 分钟。可在设备页面的 **配置 → 自动抄表间隔** 直接修改，或在 **设置 → 设备与服务 → Yunmu BLE Meter → 配置** 中修改，保存后自动重载生效。点击设备中的 **立即抄表** 可手动读取一次；抄表进行中或 5 秒内重复点击会拒绝执行。读取失败不会触发高速重试。
+- 抄表失败后保留最近一次成功读取的传感器数值（从未成功读取过时仍显示不可用）；连续 **3 次**实际抄表失败时，在 HA 通知中心创建**一条**通知，之后不重复提醒，直到成功一次才重新计数。**上次成功抄表时间**仅在成功时更新；通知不会推送到手机。
 - **只读**：不提供充值、清零、拉合闸或任意报文下发。
 
 ### 官方小程序兼容性（重要）
@@ -78,7 +79,7 @@ python -m compileall -q custom_components tests
 
 ## English
 
-Experimental, unofficial **read-only** Bluetooth Low Energy integration for Yunmu prepaid electricity meters, based on a single observed YM-M4-BE unit. It exposes remaining electricity (kWh), cumulative consumption (kWh), timestamp of the last successful read, a configurable device-level polling interval (5–120 minutes, default 10), and a rate-limited manual **Read now** button (5-second cooldown). It does not contact Yunmu's servers.
+Experimental, unofficial **read-only** Bluetooth Low Energy integration for Yunmu prepaid electricity meters, based on a single observed YM-M4-BE unit. It exposes remaining electricity (kWh), cumulative consumption (kWh), timestamp of the last successful read, a configurable device-level polling interval (5–120 minutes, default 10), and a rate-limited manual **Read now** button (5-second cooldown). It does not contact Yunmu's servers. After a failed read, previously valid sensor values remain visible, and one Home Assistant persistent notification is created on the third consecutive failure. A successful read resets the failure streak. This does not send a mobile push notification.
 
 **Important:** The observed `txMsgId` counter may be subject to duplicate filtering. In one experiment, the official mini-program timed out after a local read intentionally used the expected next ID; cancelling and re-reading restored operation. The root cause and collision frequency are unproven. Disable this integration before payment, recharge, or other important official meter operations. The response's trailing integrity bytes have not yet been decoded, and no complete checksum verification is implemented.
 

@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from time import monotonic
 
 from bleak.exc import BleakError
-from homeassistant.components import bluetooth
+from homeassistant.components import bluetooth, persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -23,6 +23,8 @@ from .transport import YunmuBLEError, read_meter
 
 _LOGGER = logging.getLogger(__name__)
 
+FAILURE_NOTIFICATION_THRESHOLD = 3
+
 
 class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
     """Polls a single meter with just one read command each interval."""
@@ -35,6 +37,8 @@ class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
         self._manual_lock = asyncio.Lock()
         self._last_manual_attempt: float | None = None
         self._read_in_progress = False
+        self._consecutive_failures = 0
+        self._failure_notification_sent = False
         super().__init__(
             hass,
             _LOGGER,
@@ -67,6 +71,24 @@ class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
             if not self.last_update_success:
                 raise HomeAssistantError("Yunmu meter read failed; check the HA logs")
 
+    def _record_failed_read(self) -> None:
+        """Alert once per uninterrupted streak of unsuccessful read attempts."""
+        self._consecutive_failures += 1
+        if (
+            self._consecutive_failures >= FAILURE_NOTIFICATION_THRESHOLD
+            and not self._failure_notification_sent
+        ):
+            persistent_notification.async_create(
+                self.hass,
+                (
+                    f"电表 {self.address} 已连续 {self._consecutive_failures} 次抄表失败。"
+                    "传感器保留上次成功的读数；请检查电表与蓝牙代理的连接。"
+                ),
+                title="云木蓝牙电表抄表失败",
+                notification_id=f"{DOMAIN}_read_failure_{self.address.replace(':', '').lower()}",
+            )
+            self._failure_notification_sent = True
+
     async def _async_update_data(self) -> MeterReading:
         self._read_in_progress = True
         try:
@@ -87,8 +109,13 @@ class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
             except (YunmuBLEError, BleakError, TimeoutError, OSError) as err:
                 raise UpdateFailed(f"Meter read failed: {err}") from err
 
+            self._consecutive_failures = 0
+            self._failure_notification_sent = False
             self.last_success = datetime.now(UTC)
             self._last_successful_id = msg_id
             return reading
+        except UpdateFailed:
+            self._record_failed_read()
+            raise
         finally:
             self._read_in_progress = False

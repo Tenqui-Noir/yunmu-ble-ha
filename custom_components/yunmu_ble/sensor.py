@@ -74,6 +74,11 @@ class YunmuSensor(CoordinatorEntity[YunmuCoordinator], SensorEntity):
         )
 
     @property
+    def available(self) -> bool:
+        """Keep the last good value visible after a failed coordinator refresh."""
+        return self.coordinator.data is not None
+
+    @property
     def native_value(self) -> float | datetime | None:
         """Return the reading in kWh (or when the last read occurred)."""
         if self.coordinator.data is None:
