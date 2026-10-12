@@ -1,4 +1,6 @@
-"""Editable, per-device meter alert and polling settings."""
+"""Editable, per-device meter settings."""
+
+from math import isfinite
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
@@ -8,13 +10,17 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
+    CONF_ELECTRICITY_PRICE,
     CONF_LOW_ENERGY_THRESHOLD,
     CONF_POLL_INTERVAL,
+    DEFAULT_ELECTRICITY_PRICE,
     DEFAULT_LOW_ENERGY_THRESHOLD,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
+    MAX_ELECTRICITY_PRICE,
     MAX_LOW_ENERGY_THRESHOLD,
     MAX_POLL_INTERVAL,
+    MIN_ELECTRICITY_PRICE,
     MIN_LOW_ENERGY_THRESHOLD,
     MIN_POLL_INTERVAL,
 )
@@ -23,8 +29,14 @@ from .const import (
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Expose the polling interval on the meter's device page."""
-    async_add_entities([YunmuPollInterval(entry), YunmuLowEnergyThreshold(entry)])
+    """Expose adjustable options as configuration entities on the device page."""
+    async_add_entities(
+        [
+            YunmuPollInterval(entry),
+            YunmuLowEnergyThreshold(entry),
+            YunmuElectricityPrice(entry),
+        ]
+    )
 
 
 class YunmuPollInterval(NumberEntity):
@@ -117,4 +129,48 @@ class YunmuLowEnergyThreshold(NumberEntity):
         self.hass.config_entries.async_update_entry(
             self._entry,
             options={**self._entry.options, CONF_LOW_ENERGY_THRESHOLD: new_threshold},
+        )
+
+
+class YunmuElectricityPrice(NumberEntity):
+    """Persist the per-kWh price used by monetary estimates."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "electricity_price"
+    _attr_icon = "mdi:currency-cny"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_should_poll = False
+    _attr_mode = NumberMode.BOX
+    _attr_native_min_value = MIN_ELECTRICITY_PRICE
+    _attr_native_max_value = MAX_ELECTRICITY_PRICE
+    _attr_native_step = 0.001
+    _attr_native_unit_of_measurement = "CNY/kWh"
+
+    def __init__(self, entry: ConfigEntry) -> None:
+        self._entry = entry
+        address = entry.data["address"]
+        self._attr_unique_id = f"{address}_electricity_price"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, address)},
+            name=entry.title,
+            manufacturer="Yunmu (unofficial)",
+            model="BLE prepaid electricity meter (experimental)",
+            connections={("bluetooth", address)},
+        )
+
+    @property
+    def native_value(self) -> float:
+        """Return the last configured rate without resetting existing prices."""
+        return float(self._entry.options.get(CONF_ELECTRICITY_PRICE, DEFAULT_ELECTRICITY_PRICE))
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Store the new price; the options listener reloads monetary estimates."""
+        if not isfinite(value) or not MIN_ELECTRICITY_PRICE <= value <= MAX_ELECTRICITY_PRICE:
+            raise ValueError("Electricity price must be a finite value from 0 to 10 CNY/kWh")
+        new_price = float(value)
+        if self.native_value == new_price:
+            return
+        self.hass.config_entries.async_update_entry(
+            self._entry,
+            options={**self._entry.options, CONF_ELECTRICITY_PRICE: new_price},
         )

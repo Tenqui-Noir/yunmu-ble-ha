@@ -28,10 +28,9 @@
         "title": "云木抄表选项",
         "data": {
           "poll_interval": "抄表间隔（分钟，5～120）",
-          "low_energy_threshold": "低电量提醒阈值（度／kWh；0 为关闭）",
-          "electricity_price": "电费单价（元/kWh，0～10）"
+          "low_energy_threshold": "低电量提醒阈值（度／kWh；0 为关闭）"
         },
-        "description": "设置抄表间隔、低电量提醒阈值和电费单价。余额由剩余电量估算，累计花费按实际抄表增量计价。"
+        "description": "设置抄表间隔和低电量提醒阈值。电费单价可在设备页面的配置实体中修改。"
       }
     }
   },
@@ -64,6 +63,9 @@
       },
       "low_energy_threshold": {
         "name": "低电量提醒阈值"
+      },
+      "electricity_price": {
+        "name": "电费单价"
       }
     }
   }

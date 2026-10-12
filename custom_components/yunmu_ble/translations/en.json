@@ -28,10 +28,9 @@
         "title": "Yunmu polling options",
         "data": {
           "poll_interval": "Polling interval (minutes, 5–120)",
-          "low_energy_threshold": "Low electricity alert threshold (kWh; 0 disables)",
-          "electricity_price": "Electricity unit price (CNY/kWh, 0–10)"
+          "low_energy_threshold": "Low electricity alert threshold (kWh; 0 disables)"
         },
-        "description": "Set polling, low-energy threshold and electricity price. The balance is estimated from remaining energy; cumulative spending uses recorded usage deltas."
+        "description": "Set polling and the low-energy threshold. Edit electricity unit price in the device configuration entities."
       }
     }
   },
@@ -64,6 +63,9 @@
       },
       "low_energy_threshold": {
         "name": "Low electricity alert threshold"
+      },
+      "electricity_price": {
+        "name": "Electricity unit price"
       }
     }
   }

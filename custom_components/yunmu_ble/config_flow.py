@@ -11,17 +11,13 @@ from homeassistant.const import CONF_ADDRESS
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
-    CONF_ELECTRICITY_PRICE,
     CONF_LOW_ENERGY_THRESHOLD,
     CONF_POLL_INTERVAL,
-    DEFAULT_ELECTRICITY_PRICE,
     DEFAULT_LOW_ENERGY_THRESHOLD,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
-    MAX_ELECTRICITY_PRICE,
     MAX_LOW_ENERGY_THRESHOLD,
     MAX_POLL_INTERVAL,
-    MIN_ELECTRICITY_PRICE,
     MIN_LOW_ENERGY_THRESHOLD,
     MIN_POLL_INTERVAL,
 )
@@ -97,7 +93,11 @@ class YunmuOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            # The price is now edited on the device page; retain it when saving
+            # options that are still exposed in this dialog.
+            return self.async_create_entry(
+                title="", data={**self._config_entry.options, **user_input}
+            )
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
@@ -120,15 +120,6 @@ class YunmuOptionsFlow(config_entries.OptionsFlow):
                         vol.Coerce(int),
                         vol.Range(min=MIN_LOW_ENERGY_THRESHOLD, max=MAX_LOW_ENERGY_THRESHOLD),
                     ),
-                    vol.Required(
-                        CONF_ELECTRICITY_PRICE,
-                        default=self._config_entry.options.get(
-                            CONF_ELECTRICITY_PRICE, DEFAULT_ELECTRICITY_PRICE
-                        ),
-                    ): vol.All(
-                        vol.Coerce(float),
-                        vol.Range(min=MIN_ELECTRICITY_PRICE, max=MAX_ELECTRICITY_PRICE),
-                    )
                 }
             ),
         )
