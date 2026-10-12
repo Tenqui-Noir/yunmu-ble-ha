@@ -2,7 +2,7 @@
 
 import importlib.util
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from types import ModuleType
 
@@ -63,12 +63,12 @@ def test_recorder_change_uses_existing_history_without_ble(monkeypatch):
     assert all(call[2] == "sensor.yunmu_total_energy" for call in calls)
     assert all(call[3] == {"change"} for call in calls)
     assert all(call[4] == {"energy": "kWh"} for call in calls)
-    assert all(call[0].tzinfo == timezone.utc for call in calls)
+    assert all(call[0].tzinfo == UTC for call in calls)
 
 
 def test_missing_statistics_are_unknown_not_zero(monkeypatch):
     module = load_analytics(monkeypatch, lambda *args: {"change": None})
-    now = datetime(2026, 10, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 10, 12, tzinfo=UTC)
     result = module.calculate_period_usage(object(), "sensor.energy", now)
     assert all(value is None for value in result.values())
 
@@ -76,6 +76,6 @@ def test_missing_statistics_are_unknown_not_zero(monkeypatch):
 @pytest.mark.parametrize("change,expected", [(-2.0, 0.0), (float("nan"), None)])
 def test_bad_statistics_never_show_negative_or_nan(monkeypatch, change, expected):
     module = load_analytics(monkeypatch, lambda *args: {"change": change})
-    now = datetime(2026, 10, 12, tzinfo=timezone.utc)
+    now = datetime(2026, 10, 12, tzinfo=UTC)
     result = module.calculate_period_usage(object(), "sensor.energy", now)
     assert all(value == expected for value in result.values())

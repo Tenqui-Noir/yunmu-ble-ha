@@ -15,8 +15,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import (
     CONF_ELECTRICITY_PRICE,
     CONF_LOW_ENERGY_THRESHOLD,
-    DEFAULT_ELECTRICITY_PRICE,
     CONF_POLL_INTERVAL,
+    DEFAULT_ELECTRICITY_PRICE,
     DEFAULT_LOW_ENERGY_THRESHOLD,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
