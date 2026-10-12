@@ -31,7 +31,7 @@
           "low_energy_threshold": "低电量提醒阈值（度／kWh；0 为关闭）",
           "electricity_price": "电费单价（元/kWh，0～10）"
         },
-        "description": "设置抄表间隔、低电量提醒阈值和电费单价。周期用电量从 HA Recorder 历史统计中计算。"
+        "description": "设置抄表间隔、低电量提醒阈值和电费单价。余额由剩余电量估算，累计花费按实际抄表增量计价。"
       }
     }
   },
@@ -46,20 +46,11 @@
       "last_read": {
         "name": "上次成功抄表时间"
       },
-      "daily_usage": {
-        "name": "今日用电量"
-      },
-      "weekly_usage": {
-        "name": "本周用电量"
-      },
-      "monthly_usage": {
-        "name": "本月用电量"
-      },
-      "yearly_usage": {
-        "name": "今年用电量"
-      },
       "estimated_balance": {
         "name": "预估电费余额"
+      },
+      "total_spent": {
+        "name": "累计用电花费（预估）"
       }
     },
     "button": {

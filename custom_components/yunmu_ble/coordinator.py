@@ -10,6 +10,7 @@ from homeassistant.components import bluetooth, persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -22,6 +23,7 @@ from .const import (
     DOMAIN,
     MANUAL_READ_COOLDOWN_SECONDS,
 )
+from .cost import ConsumptionCostLedger
 from .protocol import MeterReading
 from .transport import YunmuBLEError, read_meter
 
@@ -50,14 +52,10 @@ class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
         self.electricity_price = float(
             entry.options.get(CONF_ELECTRICITY_PRICE, DEFAULT_ELECTRICITY_PRICE)
         )
-        self.period_usage: dict[str, float | None] = {
-            "daily_usage": None,
-            "weekly_usage": None,
-            "monthly_usage": None,
-            "yearly_usage": None,
-        }
-        self._usage_tracking_started = False
-        self._usage_update_lock = asyncio.Lock()
+        self.cost_ledger = ConsumptionCostLedger(self.electricity_price)
+        self._cost_store = Store(
+            hass, 1, f"{DOMAIN}_cost_{self.address.replace(':', '').lower()}"
+        )
         super().__init__(
             hass,
             _LOGGER,
@@ -67,6 +65,21 @@ class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
                 minutes=entry.options.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL)
             ),
         )
+
+    async def async_load_cost(self) -> None:
+        """Restore the accumulated expense checkpoint before the first read."""
+        try:
+            self.cost_ledger.restore(await self._cost_store.async_load())
+        except Exception:
+            _LOGGER.exception("Failed to restore Yunmu cost checkpoint")
+
+    async def _async_save_cost(self, total_kwh: float) -> None:
+        """Account for new usage and persist; never turn BLE success into failure."""
+        try:
+            self.cost_ledger.observe(total_kwh)
+            await self._cost_store.async_save(self.cost_ledger.snapshot())
+        except Exception:
+            _LOGGER.exception("Failed to update Yunmu cost checkpoint")
 
     async def async_manual_read(self) -> None:
         """Request one immediate read, rejecting bursts and overlapping BLE reads."""
@@ -128,36 +141,6 @@ class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
         )
         self._low_energy_notified = True
 
-    async def async_update_period_usage(self) -> None:
-        """Refresh calendar-period consumption from HA's existing Recorder statistics.
-
-        This does not contact the meter. Missing statistics remain unknown rather
-        than making up a zero, and Recorder errors don't interrupt BLE reads.
-        """
-        if self._usage_update_lock.locked():
-            return
-        async with self._usage_update_lock:
-            try:
-                from homeassistant.components.recorder import get_instance
-                from homeassistant.helpers import entity_registry as er
-                from homeassistant.util import dt as dt_util
-
-                from .analytics import calculate_period_usage
-
-                statistic_id = er.async_get(self.hass).async_get_entity_id(
-                    "sensor", DOMAIN, f"{self.address}_total_energy"
-                )
-                if statistic_id is None:
-                    return
-                usage = await get_instance(self.hass).async_add_executor_job(
-                    calculate_period_usage, self.hass, statistic_id, dt_util.now()
-                )
-            except Exception:
-                _LOGGER.exception("Unable to calculate Yunmu consumption statistics")
-                return
-            self.period_usage = usage
-            self.async_update_listeners()
-
     async def _async_update_data(self) -> MeterReading:
         self._read_in_progress = True
         try:
@@ -183,8 +166,7 @@ class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
             self.last_success = datetime.now(UTC)
             self._last_successful_id = msg_id
             self._check_low_energy(reading)
-            if getattr(self, "_usage_tracking_started", False):
-                self.hass.async_create_task(self.async_update_period_usage())
+            await self._async_save_cost(reading.total_kwh)
             return reading
         except UpdateFailed:
             self._record_failed_read()

@@ -35,39 +35,18 @@ SENSORS = (
         state_class=SensorStateClass.TOTAL_INCREASING,
     ),
     SensorEntityDescription(
-        key="daily_usage",
-        translation_key="daily_usage",
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="weekly_usage",
-        translation_key="weekly_usage",
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="monthly_usage",
-        translation_key="monthly_usage",
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
-        key="yearly_usage",
-        translation_key="yearly_usage",
-        device_class=SensorDeviceClass.ENERGY,
-        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        state_class=SensorStateClass.MEASUREMENT,
-    ),
-    SensorEntityDescription(
         key="estimated_balance",
         translation_key="estimated_balance",
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement="CNY",
         state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="total_spent",
+        translation_key="total_spent",
+        device_class=SensorDeviceClass.MONETARY,
+        native_unit_of_measurement="CNY",
+        state_class=SensorStateClass.TOTAL_INCREASING,
     ),
     SensorEntityDescription(
         key="last_read",
@@ -111,16 +90,16 @@ class YunmuSensor(CoordinatorEntity[YunmuCoordinator], SensorEntity):
     @property
     def available(self) -> bool:
         """Keep the last good value visible after a failed coordinator refresh."""
-        if self.entity_description.key in self.coordinator.period_usage:
-            return self.coordinator.period_usage[self.entity_description.key] is not None
+        if self.entity_description.key == "total_spent":
+            return self.coordinator.cost_ledger.value is not None
         return self.coordinator.data is not None
 
     @property
     def native_value(self) -> float | datetime | None:
         """Return the reading in kWh (or when the last read occurred)."""
         key = self.entity_description.key
-        if key in self.coordinator.period_usage:
-            return self.coordinator.period_usage[key]
+        if key == "total_spent":
+            return self.coordinator.cost_ledger.value
         if self.coordinator.data is None:
             return None
         if key == "estimated_balance":

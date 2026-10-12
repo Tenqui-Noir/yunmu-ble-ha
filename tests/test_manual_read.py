@@ -24,6 +24,7 @@ def load_manual_modules(monkeypatch):
         "homeassistant.exceptions",
         "homeassistant.helpers",
         "homeassistant.helpers.device_registry",
+        "homeassistant.helpers.storage",
         "homeassistant.helpers.entity_platform",
         "homeassistant.helpers.update_coordinator",
         "bleak",
@@ -51,6 +52,7 @@ def load_manual_modules(monkeypatch):
     modules["homeassistant.core"].HomeAssistant = type("HomeAssistant", (), {})
     modules["homeassistant.exceptions"].HomeAssistantError = HomeAssistantError
     modules["homeassistant.helpers.device_registry"].DeviceInfo = dict
+    modules["homeassistant.helpers.storage"].Store = type("Store", (), {})
     modules["homeassistant.helpers.entity_platform"].AddEntitiesCallback = object
     modules["homeassistant.helpers.update_coordinator"].DataUpdateCoordinator = (
         DummyDataUpdateCoordinator
@@ -181,6 +183,12 @@ def make_polling_coordinator(coordinator_class):
     coordinator._failure_notification_sent = False
     coordinator._low_energy_threshold = 10
     coordinator._low_energy_notified = False
+    coordinator.cost_ledger = coordinator_module_cost_ledger(0.7)
+
+    async def save_cost(*args):
+        return None
+
+    coordinator._cost_store = SimpleNamespace(async_save=save_cost)
     coordinator._read_in_progress = False
     return coordinator
 
@@ -348,5 +356,51 @@ def test_low_energy_alert_disabled_and_never_triggered_by_failure(monkeypatch):
         coordinator._low_energy_threshold = 10
         await coordinator._async_update_data()
         assert len(notifications) == 1
+
+    asyncio.run(check())
+
+
+def coordinator_module_cost_ledger(price):
+    """Load the pure cost ledger for tests without a HA installation."""
+    path = INTEGRATION_DIR / "cost.py"
+    spec = importlib.util.spec_from_file_location("_test_manual_cost", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module.ConsumptionCostLedger(price)
+
+
+def test_spent_money_follows_total_usage_not_remaining_energy(monkeypatch):
+    module, _, _ = load_manual_modules(monkeypatch)
+    coordinator = make_polling_coordinator(module.YunmuCoordinator)
+    original = {"total": 7163.0, "remaining": 5.0}
+
+    monkeypatch.setattr(
+        module.bluetooth,
+        "async_ble_device_from_address",
+        lambda *args, **kwargs: SimpleNamespace(address=coordinator.address),
+        raising=False,
+    )
+
+    async def read_meter(device, msg_id):
+        return SimpleNamespace(
+            total_kwh=original["total"], remaining_kwh=original["remaining"]
+        )
+
+    monkeypatch.setattr(module, "read_meter", read_meter)
+
+    async def check():
+        await coordinator._async_update_data()
+        previous = coordinator.cost_ledger.value
+
+        original["remaining"] = 100.0  # Recharge, no usage.
+        await coordinator._async_update_data()
+        assert coordinator.cost_ledger.value == previous
+
+        original["total"] = 7165.0  # 2 kWh consumed.
+        original["remaining"] = 98.0
+        await coordinator._async_update_data()
+        assert coordinator.cost_ledger.value == pytest.approx(previous + 1.4)
 
     asyncio.run(check())

@@ -31,7 +31,7 @@
           "low_energy_threshold": "Low electricity alert threshold (kWh; 0 disables)",
           "electricity_price": "Electricity unit price (CNY/kWh, 0–10)"
         },
-        "description": "Configure polling, the low-energy threshold, and the electricity price. Period usage is calculated from Recorder statistics."
+        "description": "Set polling, low-energy threshold and electricity price. The balance is estimated from remaining energy; cumulative spending uses recorded usage deltas."
       }
     }
   },
@@ -46,20 +46,11 @@
       "last_read": {
         "name": "Last successful reading"
       },
-      "daily_usage": {
-        "name": "Daily electricity usage"
-      },
-      "weekly_usage": {
-        "name": "Weekly electricity usage"
-      },
-      "monthly_usage": {
-        "name": "Monthly electricity usage"
-      },
-      "yearly_usage": {
-        "name": "Yearly electricity usage"
-      },
       "estimated_balance": {
         "name": "Estimated electricity balance"
+      },
+      "total_spent": {
+        "name": "Estimated accumulated electricity spending"
       }
     },
     "button": {

@@ -1,8 +1,8 @@
 """Experimental, read-only integration for Yunmu BLE prepaid meters."""
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.event import async_track_time_change
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
 from .const import DOMAIN, PLATFORMS
 from .coordinator import YunmuCoordinator
@@ -12,19 +12,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Initialize polling without requiring the device to be reachable now."""
     coordinator = YunmuCoordinator(hass, entry)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    await coordinator.async_load_cost()
     # Allow HA to load the integration with initially unavailable entities.
     await coordinator.async_refresh()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    coordinator._usage_tracking_started = True
-    # Sensors are registered now, so Recorder's statistic ID can be resolved.
-    await coordinator.async_update_period_usage()
-
-    @callback
-    def _on_midnight(now) -> None:
-        """Rollover period sensors even if BLE is currently unreachable."""
-        hass.async_create_task(coordinator.async_update_period_usage())
-
-    entry.async_on_unload(async_track_time_change(hass, _on_midnight, hour=0, minute=0, second=0))
+    # Retired period sensors are superseded by statistics on the raw total.
+    registry = er.async_get(hass)
+    for old_key in ("daily_usage", "weekly_usage", "monthly_usage", "yearly_usage"):
+        entity_id = registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{coordinator.address}_{old_key}"
+        )
+        if entity_id is not None:
+            registry.async_remove(entity_id)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
     return True
 
