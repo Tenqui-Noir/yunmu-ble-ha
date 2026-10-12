@@ -125,7 +125,8 @@ class YunmuSensor(CoordinatorEntity[YunmuCoordinator], SensorEntity):
             return None
         if key == "estimated_balance":
             return round(
-                self.coordinator.data.remaining_kwh * self.coordinator.electricity_price, 2\n            )
+                self.coordinator.data.remaining_kwh * self.coordinator.electricity_price, 2
+            )
         if key == "remaining_energy":
             return self.coordinator.data.remaining_kwh
         if self.entity_description.key == "total_energy":
