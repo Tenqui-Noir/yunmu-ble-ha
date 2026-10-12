@@ -1,7 +1,8 @@
 """Experimental, read-only integration for Yunmu BLE prepaid meters."""
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.event import async_track_time_change
 
 from .const import DOMAIN, PLATFORMS
 from .coordinator import YunmuCoordinator
@@ -14,6 +15,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Allow HA to load the integration with initially unavailable entities.
     await coordinator.async_refresh()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    coordinator._usage_tracking_started = True
+    # Sensors are registered now, so Recorder's statistic ID can be resolved.
+    await coordinator.async_update_period_usage()
+
+    @callback
+    def _on_midnight(now) -> None:
+        """Rollover period sensors even if BLE is currently unreachable."""
+        hass.async_create_task(coordinator.async_update_period_usage())
+
+    entry.async_on_unload(async_track_time_change(hass, _on_midnight, hour=0, minute=0, second=0))
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
     return True
 

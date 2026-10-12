@@ -11,12 +11,16 @@ from homeassistant.const import CONF_ADDRESS
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
+    CONF_ELECTRICITY_PRICE,
     CONF_LOW_ENERGY_THRESHOLD,
+    DEFAULT_ELECTRICITY_PRICE,
     CONF_POLL_INTERVAL,
     DEFAULT_LOW_ENERGY_THRESHOLD,
     DEFAULT_POLL_INTERVAL,
     DOMAIN,
+    MAX_ELECTRICITY_PRICE,
     MAX_LOW_ENERGY_THRESHOLD,
+    MIN_ELECTRICITY_PRICE,
     MAX_POLL_INTERVAL,
     MIN_LOW_ENERGY_THRESHOLD,
     MIN_POLL_INTERVAL,
@@ -115,6 +119,15 @@ class YunmuOptionsFlow(config_entries.OptionsFlow):
                     ): vol.All(
                         vol.Coerce(int),
                         vol.Range(min=MIN_LOW_ENERGY_THRESHOLD, max=MAX_LOW_ENERGY_THRESHOLD),
+                    ),
+                    vol.Required(
+                        CONF_ELECTRICITY_PRICE,
+                        default=self._config_entry.options.get(
+                            CONF_ELECTRICITY_PRICE, DEFAULT_ELECTRICITY_PRICE
+                        ),
+                    ): vol.All(
+                        vol.Coerce(float),
+                        vol.Range(min=MIN_ELECTRICITY_PRICE, max=MAX_ELECTRICITY_PRICE),
                     )
                 }
             ),
