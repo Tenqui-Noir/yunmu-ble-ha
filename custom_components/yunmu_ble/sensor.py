@@ -39,6 +39,7 @@ SENSORS = (
         translation_key="estimated_balance",
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement="CNY",
+        state_class=SensorStateClass.TOTAL,
     ),
     SensorEntityDescription(
         key="total_spent",
