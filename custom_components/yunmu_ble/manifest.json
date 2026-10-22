@@ -1,7 +1,7 @@
 {
   "domain": "yunmu_ble",
   "name": "Yunmu BLE Meter (Experimental)",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "documentation": "https://github.com/Tenqui-Noir/yunmu-ble-ha",
   "issue_tracker": "https://github.com/Tenqui-Noir/yunmu-ble-ha/issues",
   "integration_type": "device",

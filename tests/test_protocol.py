@@ -43,19 +43,22 @@ def test_request_id_rejected(msg_id):
 
 
 @pytest.mark.parametrize(
-    ("hex_response", "tx_msg_id", "remaining", "total"),
+    ("hex_response", "tx_msg_id", "remaining", "total", "candidate_counter"),
     [
-        ("909181F091A65F9191A71E919B7C4A909199B65F", 0, 139.67, 7162.51),
-        ("909181F091A65F9191A71B919B7C7190919FBC46", 0, 139.62, 7162.56),
-        ("909081F091A65F9191A719919B7C7390911939C1", 1, 139.60, 7162.58),
-        ("900881F091A65F9191A711919B7C7B909119D159", 153, 139.52, 7162.66),
+        ("909181F091A65F9191A71E919B7C4A909199B65F", 0, 139.67, 7162.51, 97),
+        ("909181F091A65F9191A71B919B7C7190919FBC46", 0, 139.62, 7162.56, 97),
+        ("909081F091A65F9191A719919B7C7390911939C1", 1, 139.60, 7162.58, 97),
+        ("900881F091A65F9191A711919B7C7B909119D159", 153, 139.52, 7162.66, 97),
+        # Captured from HA immediately after recharge (18:58:47 on 2026-10-22).
+        ("909181F391A65F9191D003919A8B3790910F547A", 0, 167.86, 7277.18, 98),
     ],
 )
-def test_decode_captured_readings(hex_response, tx_msg_id, remaining, total):
+def test_decode_captured_readings(hex_response, tx_msg_id, remaining, total, candidate_counter):
     reading = decode(bytes.fromhex(hex_response), expected_id=tx_msg_id)
     assert reading.remaining_kwh == pytest.approx(remaining)
     assert reading.total_kwh == pytest.approx(total)
     assert reading.tx_msg_id == tx_msg_id
+    assert reading.candidate_recharge_count == candidate_counter
 
 
 def test_official_id_152_reading():
@@ -65,10 +68,28 @@ def test_official_id_152_reading():
     assert reading.total_kwh == 7162.62
 
 
+@pytest.mark.parametrize("candidate_counter", [153, 255, 256, 65535])
+def test_candidate_counter_is_not_fixed_header(candidate_counter):
+    # Synthetic layout check only: trailing integrity bytes are still unknown.
+    pkt = bytearray(bytes.fromhex("909181F091A65F9191A71E919B7C4A909199B65F"))
+    pkt[3] = (candidate_counter & 0xFF) ^ 0x91
+    pkt[4] = (candidate_counter >> 8) ^ 0x91
+    reading = decode(bytes(pkt), expected_id=0)
+    assert reading.candidate_recharge_count == candidate_counter
+    assert reading.remaining_kwh == 139.67
+    assert reading.total_kwh == 7162.51
+
+
 def test_wrong_id_is_rejected():
     pkt = bytes.fromhex("900881F091A65F9191A711919B7C7B909119D159")
     with pytest.raises(ProtocolError, match="Unexpected txMsgId"):
         decode(pkt, expected_id=0)
+
+
+def test_post_recharge_wrong_id_is_rejected():
+    pkt = bytes.fromhex("909181F391A65F9191D003919A8B3790910F547A")
+    with pytest.raises(ProtocolError, match="Unexpected txMsgId"):
+        decode(pkt, expected_id=1)
 
 
 def test_short_or_unknown_header_rejected():

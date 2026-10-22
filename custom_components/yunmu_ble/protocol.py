@@ -25,6 +25,8 @@ class MeterReading:
     tx_msg_id: int
     remaining_kwh: float
     total_kwh: float
+    # Hypothesis only: decoded bytes 3..4 correlate with a recharge record count.
+    candidate_recharge_count: int | None = None
 
 
 def encode_read_request(tx_msg_id: int) -> bytes:
@@ -57,10 +59,13 @@ def decode_read_response(packet: bytes, expected_id: int | None = None) -> Meter
         raise ProtocolError(f"Expected {RESPONSE_SIZE} bytes, received {len(packet)}")
 
     data = bytes(value ^ OBFUSCATION_KEY for value in packet)
-    # Structural markers are consistent across the recorded YM-M4-BE reads.
-    if data[0] != 0x01 or data[2:5] != b"\x10\x61\x00":
+    # Bytes 3..4 changed from 61 00 to 62 00 after a recharge. They match
+    # 97 -> 98 recharge records, but that meaning and 16-bit LE layout are
+    # hypotheses, not confirmed protocol semantics. Do not freeze them.
+    if data[0] != 0x01 or data[2] != 0x10:
         raise ProtocolError("Unrecognized Yunmu meter response header")
 
+    candidate_recharge_count = int.from_bytes(data[3:5], "little")
     tx_msg_id = data[1]
     if expected_id is not None and tx_msg_id != expected_id:
         raise ProtocolError(
@@ -77,4 +82,5 @@ def decode_read_response(packet: bytes, expected_id: int | None = None) -> Meter
         tx_msg_id=tx_msg_id,
         remaining_kwh=remaining,
         total_kwh=total,
+        candidate_recharge_count=candidate_recharge_count,
     )

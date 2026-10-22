@@ -54,9 +54,10 @@ def load_transport(monkeypatch, client):
 
 
 class FakeClient:
-    def __init__(self, send_notify=True):
+    def __init__(self, send_notify=True, response_payload=SUCCESS_RESPONSE):
         self.is_connected = True
         self.send_notify = send_notify
+        self.response_payload = response_payload
         self.events = []
         self.callback = None
 
@@ -67,7 +68,7 @@ class FakeClient:
     async def write_gatt_char(self, uuid, data, response):
         self.events.append(("write", bytes(data), response))
         if self.send_notify:
-            self.callback(None, bytearray(SUCCESS_RESPONSE))
+            self.callback(None, bytearray(self.response_payload))
 
     async def stop_notify(self, uuid):
         self.events.append("stop_notify")
@@ -90,6 +91,19 @@ def test_subscribe_then_one_read_then_disconnect(monkeypatch):
         "stop_notify",
         "disconnect",
     ]
+
+
+def test_read_after_recharge_uses_one_request(monkeypatch):
+    client = FakeClient(response_payload=bytes.fromhex("909181F391A65F9191D003919A8B3790910F547A"))
+    transport = load_transport(monkeypatch, client)
+    reading = asyncio.run(
+        transport.read_meter(SimpleNamespace(address="22:08:03:01:4C:54"), 0)
+    )
+    assert reading.remaining_kwh == 167.86
+    assert reading.total_kwh == 7277.18
+    assert reading.candidate_recharge_count == 98
+    assert sum(isinstance(x, tuple) and x[0] == "write" for x in client.events) == 1
+    assert client.events[-2:] == ["stop_notify", "disconnect"]
 
 
 def test_timeout_does_not_retry_write_and_disconnects(monkeypatch):

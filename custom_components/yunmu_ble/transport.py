@@ -43,6 +43,11 @@ async def read_meter(device: BLEDevice, tx_msg_id: int) -> MeterReading:
                 err,
             )
             return
+        _LOGGER.debug(
+            "Decoded meter Notify: txMsgId=%d candidate_recharge_count=%s",
+            reading.tx_msg_id,
+            reading.candidate_recharge_count,
+        )
         response.set_result(reading)
 
     try:
