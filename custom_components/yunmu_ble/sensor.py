@@ -25,7 +25,7 @@ SENSORS = (
         translation_key="remaining_energy",
         device_class=SensorDeviceClass.ENERGY,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
     ),
     SensorEntityDescription(
         key="total_energy",
@@ -39,14 +39,13 @@ SENSORS = (
         translation_key="estimated_balance",
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement="CNY",
-        state_class=SensorStateClass.MEASUREMENT,
     ),
     SensorEntityDescription(
         key="total_spent",
         translation_key="total_spent",
         device_class=SensorDeviceClass.MONETARY,
         native_unit_of_measurement="CNY",
-        state_class=SensorStateClass.TOTAL_INCREASING,
+        state_class=SensorStateClass.TOTAL,
     ),
     SensorEntityDescription(
         key="last_read",
