@@ -36,7 +36,12 @@ async def read_meter(device: BLEDevice, tx_msg_id: int) -> MeterReading:
             reading = decode_read_response(bytes(payload), expected_id=tx_msg_id)
         except ProtocolError as err:
             # An unrelated official-app packet is not our response.
-            _LOGGER.debug("Ignoring unrelated/invalid meter Notify: %s", err)
+            _LOGGER.debug(
+                "Ignoring meter Notify: len=%d raw=%s reason=%s",
+                len(payload),
+                bytes(payload).hex(),
+                err,
+            )
             return
         response.set_result(reading)
 
