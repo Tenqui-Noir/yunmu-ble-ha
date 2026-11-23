@@ -25,7 +25,7 @@ from .const import (
 )
 from .cost import ConsumptionCostLedger
 from .protocol import MeterReading
-from .transport import YunmuBLEError, read_meter
+from .transport import YunmuBLEError, discover_meter_key, read_meter
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,6 +39,8 @@ class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
         self.address = entry.data["address"]
         self.last_success: datetime | None = None
         self._next_tx_msg_id = 0
+        # Obfuscation key varies per unit; None means "discover on next read".
+        self._xor_key: int | None = None
         self._last_successful_id: int | None = None
         self._manual_lock = asyncio.Lock()
         self._last_manual_attempt: float | None = None
@@ -152,13 +154,21 @@ class YunmuCoordinator(DataUpdateCoordinator[MeterReading]):
                     f"Meter {self.address} not in range of a connectable Bluetooth adapter/proxy"
                 )
 
-            # Both read paths share these IDs. Advance even on a lost Notify.
+            # Both read paths share this ID counter. Advance even on a lost
+            # Notify, and wrap after 255: a repeated txMsgId is ignored by the
+            # meter for a while.
             msg_id = self._next_tx_msg_id
-            self._next_tx_msg_id = 1 - msg_id
+            self._next_tx_msg_id = (msg_id + 1) & 0xFF
 
             try:
-                reading = await read_meter(device, msg_id)
+                if self._xor_key is None:
+                    reading, self._xor_key = await discover_meter_key(device, msg_id)
+                else:
+                    reading = await read_meter(device, msg_id, self._xor_key)
             except (YunmuBLEError, BleakError, TimeoutError, OSError) as err:
+                # A changed/unknown key and a lost packet look the same; drop
+                # the cached key so the next poll rediscovers it.
+                self._xor_key = None
                 raise UpdateFailed(f"Meter read failed: {err}") from err
 
             self._consecutive_failures = 0

@@ -97,3 +97,43 @@ def test_short_or_unknown_header_rejected():
         decode(b"\x90\x91")
     with pytest.raises(ProtocolError, match="header"):
         decode(bytes(20))
+
+
+@pytest.mark.parametrize(
+    ("xor_key", "msg_id", "expected"),
+    [
+        # Reported in issue #1 as a working pair on another unit (key 0xAA).
+        (0xAA, 0xFC, "AB56AAA75E"),
+        (0xAA, 0x06, "ABACAABDA4"),
+        # Captured on a unit whose obfuscation key is 0x3E.
+        (0x3E, 0x00, "3F3E3E2F36"),
+    ],
+)
+def test_request_matches_field_observed_variants(xor_key, msg_id, expected):
+    assert encode(msg_id, xor_key).hex().upper() == expected
+
+
+def test_request_is_self_describing():
+    """Byte 2 carries the key, so a central can sweep 0x00-0xFF safely."""
+    for key in range(256):
+        pkt = encode(123, key)
+        assert pkt[0] == 0x01 ^ key
+        assert pkt[2] == key
+
+
+def test_decode_derives_response_key_from_packet():
+    """Key 0x05 unit: packet[0] ^ 0x01 must yield the right key."""
+    pkt = bytes.fromhex("04051524050cc105050ebd050524de0405facba8")
+    reading = decode(pkt)
+    assert reading.response_xor_key == 0x05
+    assert reading.tx_msg_id == 0
+    assert reading.remaining_kwh == pytest.approx(30.00)
+    assert reading.total_kwh == pytest.approx(86.67)
+
+
+def test_decode_legacy_key_still_works_without_parameter():
+    """Old captures (key 0x91) must decode unchanged."""
+    pkt = bytes.fromhex("909181F091A65F9191A71E919B7C4A909199B65F")
+    reading = decode(pkt, expected_id=0)
+    assert reading.response_xor_key == 0x91
+    assert reading.remaining_kwh == pytest.approx(139.67)
